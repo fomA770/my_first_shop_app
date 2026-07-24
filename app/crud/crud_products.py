@@ -3,7 +3,7 @@ from sqlalchemy import select, text, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.models import Product
 from app.crud.base import CRUDBase
-from app.schemas.schemas import ProductRead, ProductCreate, ProductBulkCreate, ProductFilters
+from app.schemas.schemas import ProductRead, ProductCreate, ProductBulkCreate, ProductFilters, ProductUpdate
 from typing import Optional
 from fastapi import HTTPException, status
 
@@ -76,7 +76,7 @@ class CRUDProducts(CRUDBase):
         return [ProductRead.model_validate(p) for p in new_products]
 
     async def del_product(self, db: AsyncSession, product_id: int):
-        product = CRUDBase(Product).get(db=db, obj_id=product_id)
+        product = await self.get(db=db, obj_id=product_id)
         if not product:
             raise ValueError("Product doesn't exist")
         await db.delete(product)
@@ -84,6 +84,17 @@ class CRUDProducts(CRUDBase):
 
         return ProductRead.model_validate(product)
 
-    
+    async def update_product(self, db: AsyncSession, product_id: int, product_data: ProductUpdate):
+        product = await self.get(db=db, obj_id=product_id)
+        if not product:
+            raise ValueError("Product doesn't exist")
+        update_data = product_data.model_dump(exclude_unset=True)
+
+        for key, value in update_data.items():
+            setattr(product, key, value)
+
+        await db.commit()
+        await db.refresh(product)
+        return product
 
 products_crud = CRUDProducts()

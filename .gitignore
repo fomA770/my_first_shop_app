@@ -1,6 +1,3 @@
-# Создайте .gitignore
-cat > .gitignore << 'EOF'
-# Виртуальное окружение
 venv/
 env/
 .env
