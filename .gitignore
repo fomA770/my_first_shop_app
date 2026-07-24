@@ -1,0 +1,48 @@
+# Создайте .gitignore
+cat > .gitignore << 'EOF'
+# Виртуальное окружение
+venv/
+env/
+.env
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Логи
+logs/
+*.log
+
+# База данных (если есть локальные файлы)
+*.db
+*.sqlite3
+
+# Alembic (если используете)
+alembic/versions/*.py
+!alembic/versions/__init__.py
+
+# Тесты
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Файлы настроек (секреты)
+.env
+.env.local
+.env.*.local
+
+# Docker
+*.pid
