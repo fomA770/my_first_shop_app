@@ -1,20 +1,20 @@
 #models.py
-from sqlalchemy.orm import (Mapped, mapped_column, relationship, 
-                            DeclarativeBase, validates)
-from sqlalchemy import (String, Boolean, DateTime, Table, ForeignKey, 
-                        Column, text, func, Numeric, Integer, Enum as SAEnum)
 from datetime import datetime
 from typing import Optional, List
 from enum import Enum
 from decimal import Decimal
+from sqlalchemy.orm import (Mapped, mapped_column, relationship, 
+                            DeclarativeBase, validates)
+from sqlalchemy import (String, Boolean, DateTime, Table, ForeignKey, 
+                        Column, text, func, Numeric, Integer, Enum as SAEnum)
 
-class OrderStatus(Enum):
+class OrderStatus(str, Enum):
     PENDING = "pending"
     PAID = "paid"
     SHIPPED = "shipped"
     DELIVERED = "delivered"
     CANCELED = "canceled"
-    
+
 class Base(DeclarativeBase):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
@@ -53,7 +53,7 @@ class User(Base):
         order_by="Role.name"
     )
 
-    cart: Mapped["Cart"] = relationship("Cart", back_populates="user")
+    cart: Mapped["Cart"] = relationship("Cart", back_populates="user", uselist=False)
     orders: Mapped[List["Order"]] = relationship("Order", back_populates="user")
 
     def __repr__(self) -> str:
@@ -100,8 +100,8 @@ class Cart(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
 
-    user: Mapped["User"] = relationship("User", back_populates="user")
-    items: Mapped["CartItem"] = relationship("CartItem", back_populates="cart")
+    user: Mapped["User"] = relationship("User", back_populates="cart")
+    items: Mapped[List["CartItem"]] = relationship("CartItem", back_populates="cart")
 
 class CartItem(Base):
     __tablename__="cart_items"
@@ -112,6 +112,7 @@ class CartItem(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     product: Mapped["Product"] = relationship("Product", back_populates="cart_items")
+    cart: Mapped["Cart"] = relationship("Cart", back_populates="items")
 
     @validates('quantity')
     def validate_quantity(self, key, value):
@@ -121,18 +122,19 @@ class CartItem(Base):
 
 class Order(Base):
     __tablename__="orders"
+    id: Mapped[str] = mapped_column(String(150), primary_key=True, server_default=text("uuid_generate_v4()"))
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey('users.id'), nullable=False)
-    status: Mapped[OrderStatus] = mapped_column(SAEnum(OrderStatus))
-    total_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    status: Mapped[OrderStatus] = mapped_column(SAEnum(OrderStatus), default=OrderStatus.PENDING)
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    user: Mapped["User"] = relationship("User", back_populates="order")
-    items: Mapped[List["OrderItem"]] = relationship("OrderItem", back_populates="orders", cascade="all, delete-orphan")
+    user: Mapped["User"] = relationship("User", back_populates="orders")
+    items: Mapped[List["OrderItem"]] = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
 
 class OrderItem(Base):
     __tablename__="order_items"
-    order_id: Mapped[int] = mapped_column(Integer, ForeignKey("orders.id"), nullable=False)
+    order_id: Mapped[str] = mapped_column(String(150), ForeignKey("orders.id"), nullable=False)
     product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id"), nullable=False)
     product_name: Mapped[str] = mapped_column(String(100), nullable=False)
     product_price: Mapped[Numeric] = mapped_column(Numeric(10, 2))

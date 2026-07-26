@@ -12,7 +12,7 @@ class CRUDUsers(CRUDBase[User]):
 
     async def get_by_email(self, db: AsyncSession, email: str) -> Optional[User]:
         result = await db.execute(
-            select(User).where(User.email == email)
+            select(self.model).where(self.model.email == email)
         )
         return result.scalar_one_or_none()
 
@@ -27,7 +27,7 @@ class CRUDUsers(CRUDBase[User]):
         existing = await self.get_by_email(db=db, email=user_data.email)
         if existing:
             raise ValueError("User already exists")
-        user = User(
+        user = self.model(
             email=user_data.email,
             hashed_password=hashed_password,
             full_name=user_data.full_name,

@@ -44,7 +44,7 @@ async def login_user(response: Response,
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Wrong email or password"
             )
-        token = create_user_token({"sub": email})
+        token = create_user_token({"sub": email, "id": user.id}) # TODO security.py: get id from token?
         response.set_cookie(
             key="access_token",
             value=token,
