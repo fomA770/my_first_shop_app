@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Товары - MyShop</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">🛍️ MyShop</a>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Главная</a>
+                <a href="/pages/products.html" class="nav-link active">Товары</a>
+                <a href="/pages/cart.html" class="nav-link">Корзина</a>
+                <a href="/pages/orders.html" class="nav-link">Заказы</a>
+                <a href="/pages/profile.html" class="nav-link">Профиль</a>
+            </div>
+            <div class="nav-auth" id="navAuth">
+                <!-- Заполняется JS -->
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 class="mt-2">📦 Товары</h1>
+
+        <!-- Фильтры -->
+        <div class="filters">
+            <div class="filters-grid">
+                <div class="form-group">
+                    <label>Категория</label>
+                    <input type="text" id="filterCategory" placeholder="Все категории">
+                </div>
+                <div class="form-group">
+                    <label>Цена от</label>
+                    <input type="number" id="filterMinPrice" placeholder="0" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Цена до</label>
+                    <input type="number" id="filterMaxPrice" placeholder="10000" min="0">
+                </div>
+                <div class="form-group" style="display:flex;align-items:flex-end;gap:0.5rem;">
+                    <button onclick="applyFilters()" class="btn btn-primary" style="flex:1;">🔍 Поиск</button>
+                    <button onclick="resetFilters()" class="btn btn-secondary">🔄 Сброс</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Товары -->
+        <div id="productsContainer">
+            <div class="loading">Загрузка товаров...</div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script type="module" src="/static/js/api.js"></script>
+    <script type="module" src="/static/js/auth.js"></script>
+    <script type="module" src="/static/js/products.js"></script>
+    <script type="module" src="/static/js/cart.js"></script>
+    <script type="module" src="/static/js/orders.js"></script>
+    <script type="module" src="/static/js/main.js"></script>
+
+    <script type="module">
+        import { authService } from '/static/js/auth.js';
+        import { productsService } from '/static/js/products.js';
+        import { cartService } from '/static/js/cart.js';
+        import { showToast, requireAuth, updateNavigation } from '/static/js/main.js';
+
+        // Проверка авторизации
+        if (!requireAuth()) return;
+
+        // Обновляем навигацию
+        updateNavigation();
+
+        // Состояние
+        let currentFilters = {};
+        let currentCart = null;
+
+        // Загрузка корзины
+        async function loadCart() {
+            try {
+                currentCart = await cartService.getCart();
+            } catch (error) {
+                console.log('Корзина не найдена, создайте новую');
+            }
+        }
+
+        // Загрузка товаров
+        async function loadProducts(filters = {}) {
+            const container = document.getElementById('productsContainer');
+            container.innerHTML = '<div class="loading">Загрузка товаров...</div>';
+
+            try {
+                // Загружаем корзину если ее нет
+                if (!currentCart) {
+                    await loadCart();
+                }
+
+                const products = await productsService.getProducts(filters);
+                
+                if (!products || products.length === 0) {
+                    container.innerHTML = `
+                        <div class="card text-center">
+                            <h3>😕 Товаров не найдено</h3>
+                            <p>Попробуйте изменить параметры фильтрации</p>
+                            <button onclick="resetFilters()" class="btn btn-primary">Сбросить фильтры</button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = `
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                        <span style="color:#7f8c8d;">Найдено товаров: ${products.length}</span>
+                    </div>
+                    <div class="products-grid">
+                `;
+
+                for (const product of products) {
+                    const inStock = product.storage_count > 0;
+                    
+                    html += `
+                        <div class="product-card">
+                            <div class="product-image">
+                                ${product.category === 'electronics' ? '💻' : 
+                                  product.category === 'clothing' ? '👕' :
+                                  product.category === 'books' ? '📚' :
+                                  product.category === 'food' ? '🍕' : '📦'}
+                            </div>
+                            <div class="product-info">
+                                <h3 class="product-name">${product.name}</h3>
+                                <p class="product-description">${product.description || 'Описание отсутствует'}</p>
+                                <p class="product-price">💰 ${product.price.toFixed(2)} ₽</p>
+                                <p class="product-stock">
+                                    ${inStock ? `📦 В наличии: ${product.storage_count} шт.` : '❌ Нет в наличии'}
+                                </p>
+                                <p style="color:#7f8c8d;font-size:0.85rem;margin-bottom:0.5rem;">
+                                    🏷️ ${product.category || 'Без категории'}
+                                </p>
+                                <div class="product-actions">
+                                    <button onclick="addToCart(${product.id})" 
+                                            class="btn ${inStock ? 'btn-success' : 'btn-secondary'}" 
+                                            ${!inStock ? 'disabled' : ''}
+                                            style="flex:1;">
+                                        ${inStock ? '🛒 В корзину' : 'Нет в наличии'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                html += `</div>`;
+                container.innerHTML = html;
+
+            } catch (error) {
+                console.error('Ошибка загрузки:', error);
+                container.innerHTML = `
+                    <div class="card text-center" style="border-color:#e74c3c;">
+                        <h3 style="color:#e74c3c;">❌ Ошибка загрузки товаров</h3>
+                        <p style="color:#7f8c8d;">${error.message || 'Попробуйте обновить страницу'}</p>
+                        <button onclick="loadProducts()" class="btn btn-primary">🔄 Обновить</button>
+                    </div>
+                `;
+            }
+        }
+
+        // Добавление в корзину
+        window.addToCart = async function(productId) {
+            if (!currentCart) {
+                showToast('❌ Ошибка: корзина не найдена', 'error');
+                return;
+            }
+
+            const button = event?.target;
+            if (button) {
+                button.disabled = true;
+                button.textContent = '⏳ Добавление...';
+            }
+
+            try {
+                await cartService.addToCart(productId, currentCart.id, 1);
+                showToast('✅ Товар добавлен в корзину!', 'success');
+                
+                // Обновляем корзину
+                await loadCart();
+                
+                // Обновляем кнопку
+                if (button) {
+                    button.textContent = '✅ В корзине';
+                    button.className = 'btn btn-success';
+                    setTimeout(() => {
+                        button.textContent = '🛒 В корзину';
+                        button.className = 'btn btn-success';
+                        button.disabled = false;
+                    }, 2000);
+                }
+            } catch (error) {
+                showToast('❌ Ошибка: ' + error.message, 'error');
+                if (button) {
+                    button.textContent = '🛒 В корзину';
+                    button.disabled = false;
+                }
+            }
+        };
+
+        // Применение фильтров
+        window.applyFilters = function() {
+            const filters = {};
+            const category = document.getElementById('filterCategory').value.trim();
+            const minPrice = document.getElementById('filterMinPrice').value;
+            const maxPrice = document.getElementById('filterMaxPrice').value;
+            
+            if (category) filters.category = category;
+            if (minPrice && parseFloat(minPrice) >= 0) filters.min_price = parseFloat(minPrice);
+            if (maxPrice && parseFloat(maxPrice) >= 0) filters.max_price = parseFloat(maxPrice);
+            
+            currentFilters = filters;
+            loadProducts(filters);
+        };
+
+        // Сброс фильтров
+        window.resetFilters = function() {
+            document.getElementById('filterCategory').value = '';
+            document.getElementById('filterMinPrice').value = '';
+            document.getElementById('filterMaxPrice').value = '';
+            currentFilters = {};
+            loadProducts();
+        };
+
+        // Обработчик Enter в полях фильтров
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputs = document.querySelectorAll('#filterCategory, #filterMinPrice, #filterMaxPrice');
+            inputs.forEach(input => {
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        applyFilters();
+                    }
+                });
+            });
+        });
+
+        // Загрузка при открытии
+        await loadCart();
+        await loadProducts();
+
+        // Обновляем корзину каждые 30 секунд
+        setInterval(async () => {
+            try {
+                await loadCart();
+            } catch (e) {
+                console.log('Ошибка обновления корзины:', e);
+            }
+        }, 30000);
+
+        console.log('✅ Страница товаров загружена');
+        console.log('👤 Пользователь:', authService.getCurrentUser());
+        console.log('🛒 Корзина:', currentCart);
+    </script>
+</body>
+</html>

@@ -3,25 +3,41 @@ from pydantic import BaseModel, EmailStr, ConfigDict, field_serializer, Field
 from datetime import datetime
 from typing import List, Optional
 from enum import Enum
-from app.models.models import OrderStatus
+from app.models.models import OrderStatus, RolesEnum
 
+
+class RoleGive(BaseModel):
+    user_id: int
+    name: str
+class RoleRead(BaseModel):
+    id: int
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
     full_name: str
+    description: Optional[str] = Field(None, description="Used when user tries to register")
+
+    model_config = ConfigDict(from_attributes=True)
 
 class UserRead(BaseModel):
     id: int
     email: EmailStr
     full_name: str
     is_active: bool
-    roles: List[str]
+    roles: List[RoleRead]
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = None
     full_name: Optional[str] = None
     is_active: Optional[bool] = None
+
 
 class ProductCreate(BaseModel):
     name: str

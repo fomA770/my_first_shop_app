@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.crud.base import CRUDBase
-from app.models.models import User, Role
+from app.models.models import User, Role, RolesEnum
 from app.schemas.schemas import UserCreate, UserRead
 
 class CRUDUsers(CRUDBase[User]):
@@ -20,7 +20,7 @@ class CRUDUsers(CRUDBase[User]):
                            db: AsyncSession,
                            user_data: UserCreate,
                            hashed_password: str,
-                           role_name: str = "customer") -> UserRead:
+                           role_name: RolesEnum = RolesEnum.CUSTOMER) -> User:
         """
         CRUD operations for USERS table
         """
@@ -45,7 +45,7 @@ class CRUDUsers(CRUDBase[User]):
         db.add(user)
         await db.commit()
         await db.refresh(user)
-
+        return user
         return UserRead(
             id=user.id,
             email=user.email,
@@ -54,5 +54,6 @@ class CRUDUsers(CRUDBase[User]):
             roles=[r.name for r in user.roles]
         )
         
-
+    async def give_role(self, db: AsyncSession, user_id: int):
+        pass
 user_crud = CRUDUsers()

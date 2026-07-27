@@ -1,4 +1,3 @@
-from passlib.context import CryptContext
 from app.core.config import settings
 from typing import Dict
 import jwt
@@ -6,18 +5,21 @@ from datetime import datetime, timezone, timedelta
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from app.crud.crud_users import user_crud
-
+import bcrypt
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-myctx = CryptContext(schemes=["bcrypt"])
 
 def hash_password(password: str):
-    hashed_password = myctx.hash(password)
-    return hashed_password
+    salt = bcrypt.gensalt(rounds=12)
+    hashed_password = bcrypt.hashpw(password.encode("utf-8"), salt=salt)
+    return hashed_password.decode("utf-8")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return myctx.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(
+        password=plain_password.encode("utf-8"),
+        hashed_password=hashed_password.encode("utf-8")
+    )
 
 def create_user_token(data: Dict):
     to_encode = data.copy()

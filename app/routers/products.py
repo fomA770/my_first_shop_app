@@ -41,12 +41,12 @@ async def handle_create_products(product_dict: ProductBulkCreate,
 @router.delete("/del/{product_id}") #admin
 async def handle_del_product(product_id: int, 
                              db: AsyncSession = Depends(get_db),
-                             user: User = Depends(require_admin)):
+                             user: User = Depends(require_admin)) -> ProductRead:
     try:
         result = await products_crud.del_product(db=db, product_id=product_id)
-        return result # TODO
+        return ProductRead.model_validate(result)
     except ValueError as e:
-        raise HTTPException(401, detail=str(e))
+        raise HTTPException(422, detail=str(e))
     except Exception as e:
         raise HTTPException(500, detail=str(e))
 

@@ -31,6 +31,9 @@ class CRUDOrders(CRUDBase):
         query_for_cart_items_result = await db.execute(query_for_cart_items)
         total_amount = query_for_total_amount_result.scalar() or 0.0
         cart_items = query_for_cart_items_result.all()
+        if not cart_items:
+            raise ValueError("Cart is empty")
+        
         await cart_crud.clear_cart(cart_id=cart.id, db=db)
         new_order = Order(
             total_amount=total_amount,
@@ -39,10 +42,14 @@ class CRUDOrders(CRUDBase):
         db.add(new_order)
         await db.flush()
         await db.refresh(new_order)
-        if not cart_items:
-            raise ValueError("Cart is empty")
         order_items = []
         for cart_item in cart_items:
+            product = await db.get(Product, cart_item.product_id)
+            if not product:
+                raise ValueError("Product doesn't exist")
+            if product.storage_count >= cart_item.quantity:
+                product.storage_count -= cart_item.quantity
+            db.add(product)
             order_item = OrderItem(
                 order_id=new_order.id,
                 product_id=cart_item.product_id,

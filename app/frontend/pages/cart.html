@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Корзина - MyShop</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">🛍️ MyShop</a>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Главная</a>
+                <a href="/pages/products.html" class="nav-link">Товары</a>
+                <a href="/pages/cart.html" class="nav-link active">Корзина</a>
+                <a href="/pages/orders.html" class="nav-link">Заказы</a>
+                <a href="/pages/profile.html" class="nav-link">Профиль</a>
+            </div>
+            <div class="nav-auth" id="navAuth">
+                <button onclick="window.location.href='/'">Войти</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 class="mt-2">🛒 Корзина</h1>
+        
+        <div id="cartContainer">
+            <div class="loading">Загрузка корзины</div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script type="module" src="/static/js/api.js"></script>
+    <script type="module" src="/static/js/auth.js"></script>
+    <script type="module" src="/static/js/products.js"></script>
+    <script type="module" src="/static/js/cart.js"></script>
+    <script type="module" src="/static/js/orders.js"></script>
+    <script type="module" src="/static/js/main.js"></script>
+
+    <script type="module">
+        import { authService } from '/static/js/auth.js';
+        import { cartService } from '/static/js/cart.js';
+        import { ordersService } from '/static/js/orders.js';
+        import { showToast, requireAuth } from '/static/js/main.js';
+
+        if (!requireAuth()) return;
+
+        async function loadCart() {
+            const container = document.getElementById('cartContainer');
+            container.innerHTML = '<div class="loading">Загрузка корзины</div>';
+
+            try {
+                // Получаем корзину
+                const cart = await cartService.getCart();
+                if (!cart) {
+                    container.innerHTML = `
+                        <div class="card text-center">
+                            <h3>🛒 Корзина пуста</h3>
+                            <p>Добавьте товары из каталога</p>
+                            <a href="/pages/products.html" class="btn btn-primary">Перейти к товарам</a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Получаем товары в корзине
+                const items = await cartService.getCartItems();
+                
+                if (!items || items.length === 0) {
+                    container.innerHTML = `
+                        <div class="card text-center">
+                            <h3>🛒 Корзина пуста</h3>
+                            <p>Добавьте товары из каталога</p>
+                            <a href="/pages/products.html" class="btn btn-primary">Перейти к товарам</a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Загружаем полную информацию о товарах
+                const { productsService } = await import('/static/js/products.js');
+                const allProducts = await productsService.getProducts();
+                const productMap = {};
+                allProducts.forEach(p => productMap[p.id] = p);
+
+                // Собираем полную информацию
+                const cartItems = items.map(item => ({
+                    ...item,
+                    product: productMap[item.product_id]
+                }));
+
+                const totalItems = cartService.getTotalItems(items);
+                const totalPrice = cartItems.reduce((sum, item) => {
+                    return sum + (item.product ? item.product.price * item.quantity : 0);
+                }, 0);
+
+                container.innerHTML = `
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Товары в корзине (${totalItems} шт.)</span>
+                            <button onclick="clearCart()" class="btn btn-danger btn-sm">Очистить корзину</button>
+                        </div>
+                        
+                        ${cartItems.map(item => `
+                            <div class="cart-item">
+                                <div class="cart-item-info">
+                                    <div class="cart-item-name">${item.product ? item.product.name : 'Товар не найден'}</div>
+                                    <div class="cart-item-price">${item.product ? item.product.price : 0} ₽ × ${item.quantity}</div>
+                                </div>
+                                <div class="cart-item-quantity">
+                                    <input type="number" 
+                                           value="${item.quantity}" 
+                                           min="1" 
+                                           max="${item.product ? item.product.storage_count : 999}"
+                                           onchange="updateQuantity(${item.id}, this.value)"
+                                           style="width:60px;">
+                                    <button onclick="removeFromCart(${item.product_id})" class="btn btn-danger btn-sm">✕</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                        
+                        <div class="cart-summary">
+                            <div class="cart-total">
+                                <span>Итого:</span>
+                                <span>${totalPrice.toFixed(2)} ₽</span>
+                            </div>
+                            <button onclick="checkout()" class="btn btn-success btn-block mt-2" ${totalItems === 0 ? 'disabled' : ''}>
+                                🚀 Оформить заказ (${totalItems} шт.)
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                container.innerHTML = `<p class="text-center" style="color:red;">❌ Ошибка: ${error.message}</p>`;
+            }
+        }
+
+        // Обновление количества
+        window.updateQuantity = async function(cartItemId, quantity) {
+            try {
+                await cartService.updateQuantity(cartItemId, parseInt(quantity));
+                showToast('✅ Количество обновлено', 'success');
+                loadCart();
+            } catch (error) {
+                showToast('❌ Ошибка: ' + error.message, 'error');
+            }
+        };
+
+        // Удаление из корзины
+        window.removeFromCart = async function(productId) {
+            try {
+                await cartService.removeFromCart(productId);
+                showToast('✅ Товар удален из корзины', 'success');
+                loadCart();
+            } catch (error) {
+                showToast('❌ Ошибка: ' + error.message, 'error');
+            }
+        };
+
+        // Очистка корзины
+        window.clearCart = async function() {
+            if (!confirm('Вы уверены, что хотите очистить корзину?')) return;
+            try {
+                await cartService.clearCart();
+                showToast('✅ Корзина очищена', 'success');
+                loadCart();
+            } catch (error) {
+                showToast('❌ Ошибка: ' + error.message, 'error');
+            }
+        };
+
+        // Оформление заказа
+        window.checkout = async function() {
+            try {
+                const order = await cartService.checkout();
+                showToast('✅ Заказ оформлен!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/pages/orders.html';
+                }, 1500);
+            } catch (error) {
+                showToast('❌ Ошибка: ' + error.message, 'error');
+            }
+        };
+
+        loadCart();
+    </script>
+</body>
+</html>

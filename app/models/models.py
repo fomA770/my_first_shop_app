@@ -15,6 +15,11 @@ class OrderStatus(str, Enum):
     DELIVERED = "delivered"
     CANCELED = "canceled"
 
+class RolesEnum(str, Enum):
+    ADMIN = "admin"
+    MANAGER = "manager"
+    CUSTOMER = "customer"
+
 class Base(DeclarativeBase):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
@@ -61,7 +66,7 @@ class User(Base):
 
 class Role(Base):
     __tablename__ = "roles"
-    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    name: Mapped[str] = mapped_column(String(20), default=RolesEnum.CUSTOMER, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(255))
 
     users: Mapped[List["User"]] = relationship(

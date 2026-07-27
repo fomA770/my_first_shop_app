@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Заказы - MyShop</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">🛍️ MyShop</a>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Главная</a>
+                <a href="/pages/products.html" class="nav-link">Товары</a>
+                <a href="/pages/cart.html" class="nav-link">Корзина</a>
+                <a href="/pages/orders.html" class="nav-link active">Заказы</a>
+                <a href="/pages/profile.html" class="nav-link">Профиль</a>
+            </div>
+            <div class="nav-auth" id="navAuth">
+                <button onclick="window.location.href='/'">Войти</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 class="mt-2">📋 Мои заказы</h1>
+        
+        <div id="ordersContainer">
+            <div class="loading">Загрузка заказов</div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script type="module" src="/static/js/api.js"></script>
+    <script type="module" src="/static/js/auth.js"></script>
+    <script type="module" src="/static/js/products.js"></script>
+    <script type="module" src="/static/js/cart.js"></script>
+    <script type="module" src="/static/js/orders.js"></script>
+    <script type="module" src="/static/js/main.js"></script>
+
+    <script type="module">
+        import { authService } from '/static/js/auth.js';
+        import { ordersService } from '/static/js/orders.js';
+        import { productsService } from '/static/js/products.js';
+        import { showToast, requireAuth } from '/static/js/main.js';
+
+        if (!requireAuth()) return;
+
+        async function loadOrders() {
+            const container = document.getElementById('ordersContainer');
+            container.innerHTML = '<div class="loading">Загрузка заказов</div>';
+
+            try {
+                const orders = await ordersService.getOrders();
+                
+                if (!orders || orders.length === 0) {
+                    container.innerHTML = `
+                        <div class="card text-center">
+                            <h3>📋 У вас пока нет заказов</h3>
+                            <p>Перейдите в каталог и сделайте свой первый заказ</p>
+                            <a href="/pages/products.html" class="btn btn-primary">Перейти к товарам</a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Загружаем информацию о товарах
+                const allProducts = await productsService.getProducts();
+                const productMap = {};
+                allProducts.forEach(p => productMap[p.id] = p);
+
+                let html = '';
+                for (const order of orders) {
+                    const statusText = ordersService.getStatusText(order.status);
+                    const statusColor = ordersService.getStatusColor(order.status);
+                    
+                    // Собираем продукты заказа
+                    const orderProducts = order.products || [];
+                    
+                    html += `
+                        <div class="order-card">
+                            <div class="order-header">
+                                <span class="order-id">Заказ #${order.id}</span>
+                                <span class="order-status" style="background:${statusColor}20;color:${statusColor};border:1px solid ${statusColor}40;">
+                                    ${statusText}
+                                </span>
+                            </div>
+                            <div class="order-products">
+                                ${orderProducts.map(op => `
+                                    <div class="order-product">
+                                        <span>${productMap[op.product_id] ? productMap[op.product_id].name : 'Товар #' + op.product_id}</span>
+                                        <span>${op.quantity} шт. × ${productMap[op.product_id] ? productMap[op.product_id].price : 0} ₽</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div class="order-total">
+                                Итого: ${orderProducts.reduce((sum, op) => {
+                                    return sum + (productMap[op.product_id] ? productMap[op.product_id].price * op.quantity : 0);
+                                }, 0).toFixed(2)} ₽
+                            </div>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = html;
+
+            } catch (error) {
+                container.innerHTML = `<p class="text-center" style="color:red;">❌ Ошибка: ${error.message}</p>`;
+            }
+        }
+
+        loadOrders();
+    </script>
+</body>
+</html>
